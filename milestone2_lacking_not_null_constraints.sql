@@ -81,9 +81,9 @@ create table Student_instructor_Course_Take
 student_id int ,
 instructor_id int,
 course_id int ,
-semester_code int,
+semester_code varchar(40),
 exam_type varchar(40),
-grade decimal Default(NULL),
+grade varchar(40) Default(NULL),
 primary key ( course_id, student_id, instructor_id),
 foreign key(student_id) references student(student_id),
 foreign key(instructor_id) references Instructor(instructor_id) ,
@@ -92,7 +92,7 @@ foreign key(course_id) references course(course_id)
 
 create table semester
 (
-semester_code int primary key,
+semester_code varchar(40) primary key,
 Start_date date,
 End_date date
 ); 
@@ -100,7 +100,7 @@ End_date date
 create table course_semester 
 (
 course_id int ,
-semester_code int ,
+semester_code varchar(40) ,
 primary key ( course_id, semester_code)
 );
 
@@ -108,8 +108,8 @@ primary key ( course_id, semester_code)
 create table slot
 (
 slot_id int primary key, 
-day date,
-time time,
+day varchar(40),
+time varchar(40),
 location varchar(40),
 course_id int,
 instructor_id int,
@@ -120,9 +120,9 @@ foreign key(instructor_id) references instructor(instructor_id)
 create table graduation_plan
 (
 plan_id int,
-semester_code int ,
+semester_code varchar(40) ,
 semester_credit_hours int,
-expected_grad_smester decimal,
+expected_grad_semester varchar(40),
 advisor_id int,
 student_id int,
 primary key ( plan_id, semester_code),
@@ -133,7 +133,7 @@ foreign key (student_id) references student(student_id)
 create table GradPlan_course
 (
 plan_id int,
-semester_code int ,
+semester_code varchar(40) ,
 course_id int ,
 primary key ( plan_id, semester_code, course_id),
 foreign key (semester_code) references semester(semester_code),
@@ -145,7 +145,7 @@ create table Request
 request_id int primary key,
 type_ varchar(40),
 comment Varchar(40),
-status_ varchar Default('Pending') check(status_ IN('Pending','Accepted','Rejected')),
+status_ varchar(40) Default('Pending') check(status_ IN('Pending','Accepted','Rejected')),
 credit_hours int,
 student_id int ,
 advisor_id int,
@@ -176,13 +176,14 @@ foreign key (exam_id) references MakeUp_exam(exam_id)
 create table payment
 (
 payment_id int primary key,
-amount decimal,
-deadline date,
+amount int,
+deadline datetime,
 n_installments int,
-status_ varchar Default('notPaid') check(status_ IN('notPaid','Paid')),
-fund_percentage float,
+status_ varchar(40) Default('notPaid') check(status_ IN('notPaid','Paid')),
+start_date_ datetime,
+fund_percentage decimal,
 student_id int,
-semester_code int,
+semester_code varchar(40),
 start_date date,
 foreign key (student_id) references student(student_id),
 foreign key (semester_code) references semester(semester_code)
@@ -191,15 +192,65 @@ foreign key (semester_code) references semester(semester_code)
 create table installments 
 (
 payment_id int,
-deadline date,
-amount decimal,
-status_ varchar Default('notPaid') check(status_ IN('notPaid','Paid')),
-start_date date,
+deadline datetime,
+amount int,
+status_ varchar(40) Default('notPaid') check(status_ IN('notPaid','Paid')),
+start_date datetime,
 primary key (payment_id, deadline),
 foreign key (payment_id) references payment(payment_id)
 );
 GO
 EXEC CreateAllTables
+
+GO
+
+
+
+CREATE VIEW view_Students AS
+SELECT *
+FROM student
+
+GO
+
+CREATE VIEW view_Course_prerequisites AS
+SELECT *
+FROM course LEFT JOIN preqCourse ON course.course_id = preqCourse.course_id
+
+GO
+CREATE VIEW Instructors_AssignedCourses AS
+SELECT i.*
+FROM Instructor i LEFT OUTER JOIN Instructor_course ON Instructor.instructor_id = Instructor_course.instructor_id
+GO
+
+CREATE VIEW Student_Payment AS
+SELECT *
+FROM payment INNER JOIN student ON payment.student_id = student.student_id
+GO
+
+CREATE VIEW Courses_Slots_Instructor AS 
+SELECT c.course_id,c.name,s.slot_id,s.day,s.time,s.location,Instructor.name
+FROM (course c LEFT OUTER JOIN slot s ON course.course_id = slot.course_id) LEFT OUTER JOIN Instructor ON slot.instructor_id = Instructor.instructor_id
+GO
+
+CREATE VIEW Courses_MakeupExams AS
+SELECT c.name,c.semester,m.*
+FROM course c LEFT OUTER JOIN MakeUp_Exam m ON c.course_id = m.course_id
+GO
+
+CREATE VIEW Students_Courses_transcript AS
+SELECT st.student_id,s.name,c.course_id,c.name,st.exam_type,st.grade,st.semester_code,i.name
+FROM ((Student_instructor_Course_Take st INNER JOIN student s ON st.student_id = s.student_id) INNER JOIN course c ON st.course_id = c.course_id) INNER JOIN Instructor i ON st.instructor_id = i.instructor_id
+GO
+
+CREATE VIEW Semster_offered_Courses AS
+SELECT c.course_id,c.course_id,c.semester
+FROM cource c
+GO
+
+CREATE VIEW Advisors_Graduation_Plan AS
+SELECT g.*,a.advisor_id,a.name
+FROM graduation_plan g LEFT OUTER JOIN advisor a ON g.advisor_id = a.advisor_id
+
 
 GO
 CREATE PROCEDURE DropAllTables
@@ -301,6 +352,7 @@ SELECT *
 FROM student inner join advisor on student.advisor_id = advisor.advisor_id
 GO
 
+
 GO
 CREATE PROCEDURE AdminAddingSemester
 @start_date date, 
@@ -352,5 +404,389 @@ AS
     SET advisor_id = @advisorID
     WHERE student_id = @studentID;
 GO
+
+CREATE VIEW all_Pending_Requests AS
+SELECT r.*,s.name,a.name
+FROM (Request r LEFT OUTER JOIN student s ON r.student_id = s.student_id) LEFT OUTER JOIN advisor a ON r.advisor_id = a.advisor_id
+GO
+
+GO
+CREATE PROCEDURE Procedures_AdvisorCreateGP
+@semester_code varchar(40),
+@expected_graduation_date date,
+@sem_credit_hours int,
+@advisor_id int,
+@student_id int
+AS
+SELECT *
+FROM graduation_plan
+GO
+
+GO
+CREATE PROCEDURE Procedures_AdvisorAddCourseGP
+ @student_id int, 
+ @Semester_code varchar (40), 
+ @course_name varchar (40)
+ AS
+ DECLARE @p_id int
+ DECLARE @c_id int
+ SELECT @p_id = plan_id 
+ FROM graduation_plan
+ WHERE (student_id = @student_id) AND (semester_code = @Semester_code);
+ SELECT @c_id = course_id
+ FROM course
+ WHERE name = @course_name;
+ INSERT INTO GradPlan_course
+ VALUES(@p_id,@Semester_code,@c_id)
+ GO
+
+GO
+CREATE PROCEDURE Procedures_AdvisorUpdateGP
+@expected_grad_semster varchar(40),
+@studentID int
+AS
+    UPDATE graduation_plan
+    SET expected_grad_semster = @expected_grad_semster
+    WHERE student_id = @studentID;
+GO
+
+GO
+CREATE PROCEDURE Procedures_AdvisorDeleteFromGP
+@studentID int, 
+@semester_code varchar(40),
+@course_ID int
+AS
+DECLARE @p_id int
+SELECT @p_id = plan_id 
+FROM graduation_plan
+WHERE (student_id = @student_id) AND (semester_code = @Semester_code);
+
+DELETE FROM GradPlan_course
+WHERE (plan_id = @p_id) AND (semester_code = @semester_code) AND (course_id = @course_ID)
+GO
+
+
+GO
+CREATE PROCEDURE Procedures_AdvisorViewAssignedStudents
+@AdvisorID int,
+@major varchar(40)
+AS
+SELECT s.*
+FROM advisor a INNER JOIN student s ON a.advisor_id = s.advisor_id
+WHERE (a.advisor_id = @AdvisorID) AND (s.major = @major)
+GO
+
+
+GO
+CREATE PROCEDURE Procedures_AdvisorViewPendingRequests
+@AdvisorID int
+AS
+SELECT R.*
+FROM Request R
+WHERE R.advisor_id = @AdvisorID
+GO
+
+GO
+CREATE PROCEDURE Procedures_StudentaddMobile
+ @StudentID int, 
+ @mobile_number varchar (40)
+ AS
+ INSERT INTO student_phone
+ values(@StudentID,@mobile_number)
+GO
+
+
+GO
+CREATE FUNCTION FN_AdvisorLogin
+(
+    @ID INT,
+    @password VARCHAR(40)
+)
+RETURNS BIT
+AS
+BEGIN
+    DECLARE @Success BIT = 0; 
+    IF EXISTS (SELECT 1 FROM advisor WHERE advisor_id = @ID AND password_ = @password)
+    BEGIN
+        SET @Success = 1;
+    END
+    RETURN @Success;
+END;
+
+GO
+CREATE FUNCTION FN_Advisors_Requests
+(
+    @advisorID INT
+)
+RETURNS TABLE
+AS
+RETURN
+(
+    SELECT
+        RequestID,
+        Type_ AS RequestType,
+        Comment,
+        Status_,
+        Credit_Hours,
+        Student_ID,
+        Advisor_ID,
+        Course_ID
+    FROM
+        Request
+    WHERE
+        Advisor_ID = @advisorID
+);
+
+
+
+GO
+CREATE PROCEDURE Procedures_AdvisorApproveRejectCourseRequest
+(
+    @RequestID INT,
+    @StudentID INT,
+    @AdvisorID INT
+)
+AS
+    DECLARE @Status VARCHAR(10);
+    DECLARE @AssignedHours INT;
+    DECLARE @PrerequisitesTaken BIT;
+
+    IF NOT EXISTS (SELECT 1 FROM student WHERE student_id = @StudentID AND advisor_id = @AdvisorID)
+    BEGIN
+       
+        RETURN;
+    END
+
+
+    SELECT
+        @Status = Status_,
+        @AssignedHours = Assigned_Hours
+    FROM
+        Request
+    WHERE
+        RequestID = @RequestID;
+
+ 
+    IF @Status <> 'Pending'
+    BEGIN
+  
+        RETURN;
+    END
+
+    SET @PrerequisitesTaken = dbo.CheckPrerequisitesTaken(@RequestID);
+
+    IF @AssignedHours < dbo.GetCourseCreditHours(@RequestID)
+    BEGIN
+        
+        RETURN;
+    END
+
+
+    IF @PrerequisitesTaken = 1
+    BEGIN
+        UPDATE Request
+        SET Status_ = 'Accepted'
+        WHERE RequestID = @RequestID;
+    END
+    ELSE
+    BEGIN
+        UPDATE Request
+        SET Status_ = 'Rejected'
+        WHERE RequestID = @RequestID;
+    END
+GO
+
+
+
+CREATE FUNCTION FN_StudentLogin
+(
+    @StudentID INT,
+    @Password VARCHAR(40)
+)
+RETURNS BIT
+AS
+BEGIN
+    DECLARE @Success BIT = 0;
+
+   
+    IF EXISTS (SELECT 1 FROM student WHERE student_id = @StudentID AND password_ = @Password)
+    BEGIN
+        SET @Success = 1; 
+    END
+
+    RETURN @Success;
+END;
+
+
+
+GO
+CREATE FUNCTION FN_SemsterAvailableCourses
+(
+    @semester_code VARCHAR(40)
+)
+RETURNS TABLE
+AS
+RETURN
+(
+    SELECT
+        C.course_id,
+        C.name AS course_name,
+        C.major,
+        C.credit_hours,
+        I.name AS instructor_name,
+        S.slot_id,
+        S.day,
+        S.time,
+        S.location
+    FROM
+        course C
+    INNER JOIN
+        course_semester CS ON C.course_id = CS.course_id
+    INNER JOIN
+        slot S ON C.course_id = S.course_id
+    LEFT JOIN
+        Instructor_course IC ON C.course_id = IC.course_id
+    LEFT JOIN
+        Instructor I ON IC.instructor_id = I.instructor_id
+    WHERE
+        CS.semester_code = @semester_code
+        AND C.is_offered = 1
+);
+
+
+GO
+CREATE PROCEDURE Procedures_StudentSendingCourseRequest
+(
+    @StudentID INT,
+    @CourseID INT,
+    @Type VARCHAR(40),
+    @Comment VARCHAR(40)
+)
+AS
+    DECLARE @AdvisorID INT;
+    SELECT @AdvisorID = advisor_id
+    FROM student
+    WHERE student_id = @StudentID;
+    INSERT INTO Request (type_, comment, status_, credit_hours, student_id, advisor_id, course_id)
+    VALUES (@Type, @Comment, 'Pending', dbo.GetCourseCreditHours(@CourseID), @StudentID, @AdvisorID, @CourseID);
+GO
+
+
+CREATE PROCEDURE Procedures_StudentSendingCHRequest
+(
+    @StudentID INT,
+    @CreditHours INT,
+    @Type VARCHAR(40),
+    @Comment VARCHAR(40)
+)
+AS
+    DECLARE @AdvisorID INT;
+    SELECT @AdvisorID = advisor_id
+    FROM student
+    WHERE student_id = @StudentID;
+    INSERT INTO Request (type_, comment, status_, credit_hours, student_id, advisor_id)
+    VALUES (@Type, @Comment, 'Pending', @CreditHours, @StudentID, @AdvisorID);
+GO
+
+CREATE FUNCTION FN_StudentViewGP
+(
+    @StudentID INT
+)
+RETURNS TABLE
+AS
+RETURN
+(
+    SELECT
+        S.student_id AS Student_ID,
+        S.f_name + ' ' + S.l_name AS Student_Name,
+        GP.plan_id AS Graduation_Plan_ID,
+        GC.course_id AS Course_ID,
+        C.name AS Course_Name,
+        GC.semester_code AS Semester_Code,
+        GP.expected_grad_smester AS Expected_Graduation_Date,
+        GP.semester_credit_hours AS Semester_Credit_Hours,
+        GP.advisor_id AS Advisor_ID
+    FROM
+        student S
+    INNER JOIN
+        graduation_plan GP ON S.student_id = GP.student_id
+    INNER JOIN
+        GradPlan_course GC ON GP.plan_id = GC.plan_id
+    INNER JOIN
+        course C ON GC.course_id = C.course_id
+    WHERE
+        S.student_id = @StudentID
+);
+
+
+GO
+CREATE FUNCTION FN_StudentUpcomingInstallment
+(
+    @StudentID INT
+)
+RETURNS DATE
+AS
+BEGIN
+    DECLARE @UpcomingInstallmentDeadline DATE;
+
+    -- Find the first not paid installment deadline for the student
+    SELECT TOP 1
+        @UpcomingInstallmentDeadline = I.deadline
+    FROM
+        payment P
+    INNER JOIN
+        installments I ON P.payment_id = I.payment_id
+    WHERE
+        P.student_id = @StudentID
+        AND I.status_ = 'notPaid'
+    ORDER BY
+        I.deadline;
+
+    RETURN @UpcomingInstallmentDeadline;
+END;
+
+
+GO
+CREATE FUNCTION FN_StudentViewSlot
+(
+    @CourseID INT,
+    @InstructorID INT
+)
+RETURNS TABLE
+AS
+RETURN
+(
+    SELECT
+        S.slot_id AS Slot_ID,
+        S.location,
+        S.time,
+        S.day,
+        C.name AS Course_Name,
+        I.name AS Instructor_Name
+    FROM
+        slot S
+    INNER JOIN
+        course C ON S.course_id = C.course_id
+    INNER JOIN
+        Instructor_course IC ON S.course_id = IC.course_id
+    INNER JOIN
+        Instructor I ON IC.instructor_id = I.instructor_id
+    WHERE
+        S.course_id = @CourseID
+        AND I.instructor_id = @InstructorID
+);
+
+
+
+GO
+CREATE PROCEDURE Procedures_ViewRequiredCourses
+    @StudentID INT,
+    @CurrentSemesterCode VARCHAR(40)
+AS
+SELECT C.*
+FROM (GradPlan_course L INNER JOIN graduation_plan G ON L.plan_id = G.plan_id) INNER JOIN course C ON C.course_id = L.course_id
+WHERE G.student_id = @StudentID
+GO
+
 
 GO
