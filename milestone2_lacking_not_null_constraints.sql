@@ -790,3 +790,28 @@ GO
 
 
 GO
+CREATE PROCEDURE Procedures_StudentRegisterFirstMakeup @StudentID INT, @CourseID INT, @studentCurrentSemester VARCHAR(40)
+AS
+BEGIN
+--    IF NOT EXISTS (SELECT * FROM MakeUp_Exam me INNER JOIN exam_student es ON me.exam_id = es.exam_id WHERE es.student_id = @StudentID AND es.student_id = @courseID)
+    IF NOT EXISTS (SELECT * FROM MakeUp_Exam me INNER JOIN exam_student es ON me.exam_id = es.exam_id WHERE me.TYPE = 'First_Makeup' AND me.student_id = @StudentID AND me.course_id = @CourseID)
+    BEGIN
+	    DECLARE @makeup_id;
+	    SELECT @makeup_id = me.exam_id FROM MakeUP_Exam me INNER JOIN exam_student es ON me.exam_id = es.exam_id;
+
+	   	INSERT INTO exam_student (exam_id, student_id, course_id)
+	   	VALUES(@makeup_id, @StudentID, @CourseID);
+    END
+END
+
+-- GO
+-- CREATE FUNCTION FN_StudentCheckSMEligiability
+-- (
+-- 	@CourseID INT,
+-- 	@StudentID INT
+-- )
+-- RETURN BIT
+-- AS
+-- 	BEGIN
+		
+-- 	END
