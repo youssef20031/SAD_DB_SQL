@@ -35,13 +35,13 @@ foreign key (advisor_id) references advisor(advisor_id)
 create table student_phone 
 (
 student_id int ,
-phone_number int, 
+phone_number varchar(40), 
 primary key ( student_id, phone_number)
 );
 
 create table course 
 (
-course_id int primary key,
+course_id int primary key identity(1,1),
 name varchar(40),
 major varchar(40),
 is_offered bit,
@@ -60,7 +60,7 @@ foreign key (course_id) references course(course_id)
 
 create table Instructor 
 (
-instructor_id int primary key,
+instructor_id int primary key identity(1,1),
 name varchar(40),
 email varchar(40),
 faculty varchar(40),
@@ -84,15 +84,15 @@ course_id int ,
 semester_code varchar(40),
 exam_type varchar(40),
 grade varchar(40) Default(NULL),
-primary key ( course_id, student_id, instructor_id),
+primary key ( course_id, student_id, semester_code),
 foreign key(student_id) references student(student_id),
-foreign key(instructor_id) references Instructor(instructor_id) ,
+foreign key(instructor_id) references Instructor(instructor_id),
 foreign key(course_id) references course(course_id)
 );
 
 create table semester
 (
-semester_code varchar(40) primary key,
+semester_code varchar(40) primary key identity(1,1),
 Start_date date,
 End_date date
 ); 
@@ -107,7 +107,7 @@ primary key ( course_id, semester_code)
 
 create table slot
 (
-slot_id int primary key, 
+slot_id int primary key identity(1,1), 
 day varchar(40),
 time varchar(40),
 location varchar(40),
@@ -119,10 +119,11 @@ foreign key(instructor_id) references instructor(instructor_id)
 
 create table graduation_plan
 (
-plan_id int,
+plan_id int identity(1,1),
 semester_code varchar(40) ,
 semester_credit_hours int,
-expected_grad_semester varchar(40),
+expected_grad_date date,
+expected_grad_semster varchar (40),
 advisor_id int,
 student_id int,
 primary key ( plan_id, semester_code),
@@ -142,7 +143,7 @@ foreign key (course_id) references course(course_id)
 
 create table Request
 (
-request_id int primary key,
+request_id int primary key identity(1,1),
 type_ varchar(40),
 comment Varchar(40),
 status_ varchar(40) Default('Pending') check(status_ IN('Pending','Accepted','Rejected')),
@@ -151,13 +152,14 @@ student_id int ,
 advisor_id int,
 course_id int,
 foreign key (advisor_id) references advisor(advisor_id),
-foreign key (student_id) references student(student_id)
+foreign key (student_id) references student(student_id),
+foreign key (course_id)  references course(course_id)
 );
 
 create table MakeUp_Exam
 (
-exam_id int primary key,
-date date,
+exam_id int primary key identity(1,1),
+date datetime,
 type_ varchar(40) DEFAULT('Normal') check(type_ IN('First_Makeup','Second_Makeup','Normal')),
 course_id int,
 foreign key (course_id) references course(course_id)
@@ -175,7 +177,7 @@ foreign key (exam_id) references MakeUp_exam(exam_id)
 
 create table payment
 (
-payment_id int primary key,
+payment_id int primary key identity(1,1),
 amount int,
 deadline datetime,
 n_installments int,
@@ -184,7 +186,6 @@ start_date_ datetime,
 fund_percentage decimal,
 student_id int,
 semester_code varchar(40),
-start_date date,
 foreign key (student_id) references student(student_id),
 foreign key (semester_code) references semester(semester_code)
 );
@@ -362,6 +363,7 @@ AS
 Set identity_insert semester ON;
 insert into semester(Start_date,End_date,semester_code)
 values(@start_date, @end_date, @semester)
+Set identity_insert semester OFF;
 GO
 
 GO
@@ -380,8 +382,10 @@ GO
 CREATE PROCEDURE  Procedures_AdminLinkInstructor
 @InstructorId int, @courseId int, @slotID int
 AS
+Set identity_insert semester ON;
 insert into slot(Instructor_Id, course_Id, slot_ID)
 values(@InstructorId , @courseId , @slotID )
+Set identity_insert semester OFF;
 GO
 
 GO
@@ -418,8 +422,8 @@ CREATE PROCEDURE Procedures_AdvisorCreateGP
 @advisor_id int,
 @student_id int
 AS
-SELECT *
-FROM graduation_plan
+insert into graduation_plan(semester_code,semester_credit_hours,expected_grad_date,advisor_id,student_id)
+VALUES(@semester_code,@sem_credit_hours,@expected_graduation_date,@advisor_id,@student_id)
 GO
 
 GO
@@ -796,7 +800,7 @@ BEGIN
 --    IF NOT EXISTS (SELECT * FROM MakeUp_Exam me INNER JOIN exam_student es ON me.exam_id = es.exam_id WHERE es.student_id = @StudentID AND es.student_id = @courseID)
     IF NOT EXISTS (SELECT * FROM MakeUp_Exam me INNER JOIN exam_student es ON me.exam_id = es.exam_id WHERE me.TYPE = 'First_Makeup' AND me.student_id = @StudentID AND me.course_id = @CourseID)
     BEGIN
-	    DECLARE @makeup_id;
+	    DECLARE @makeup_id INT;
 	    SELECT @makeup_id = me.exam_id FROM MakeUP_Exam me INNER JOIN exam_student es ON me.exam_id = es.exam_id;
 
 	   	INSERT INTO exam_student (exam_id, student_id, course_id)
@@ -815,3 +819,13 @@ END
 -- 	BEGIN
 		
 -- 	END
+GO
+CREATE PROCEDURE Procedures_ChooseInstructor
+@Student_ID int, 
+@Instructor_ID int, 
+@Course_ID int
+AS
+UPDATE Instructor_course
+SET instructor_id = @Instructor_ID
+WHERE @Course_ID = course_id
+GO
