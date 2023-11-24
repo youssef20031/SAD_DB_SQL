@@ -820,6 +820,17 @@ END
 		
 -- 	END
 GO
+
+GO
+CREATE PROCEDURE Procedures_ViewMS
+@Student_ID int
+AS
+SELECT c.*
+FROM Student_instructor_Course_Take S INNER JOIN course C ON S.course_id = C.course_id
+WHERE S.student_id = @Student_ID
+GO
+
+GO
 CREATE PROCEDURE Procedures_ChooseInstructor
 @Student_ID int, 
 @Instructor_ID int, 
@@ -827,5 +838,8 @@ CREATE PROCEDURE Procedures_ChooseInstructor
 AS
 UPDATE Instructor_course
 SET instructor_id = @Instructor_ID
-WHERE @Course_ID = course_id
+WHERE @Course_ID = course_id;
+UPDATE Student_instructor_Course_Take
+SET instructor_id = @Instructor_ID
+WHERE @Course_ID = course_id AND @Student_ID = student_id; 
 GO
