@@ -826,8 +826,11 @@ CREATE PROCEDURE Procedures_ViewMS
 @Student_ID int
 AS
 SELECT c.*
-FROM Student_instructor_Course_Take S INNER JOIN course C ON S.course_id = C.course_id
-WHERE S.student_id = @Student_ID
+FROM course c
+WHERE S.student_id = @Student_ID AND NOT EXISTS(
+SELECT c.*
+FROM
+Student_instructor_Course_Take S INNER JOIN course C1 ON S.course_id = C1.course_id)
 GO
 
 GO
